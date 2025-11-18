@@ -7,6 +7,7 @@ const {
   Session,
   StudentCourses,
   CourseStats,
+  Class,
 } = require("../models");
 
 const router = express.Router();
@@ -16,78 +17,89 @@ router.get("/student/:studentId", auth(["student"]), async (req, res) => {
   try {
     const { studentId } = req.params;
 
-    // check to ensure only authorized student access their record
-    if (req.user.id != studentId) {
+    // Ensure students only access their own report
+    if (req.user.id !== studentId) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden - cannot view another student's report",
+        message: "Unauthorized to view another student's report",
       });
     }
 
-    // fetch all courses student is enrolled in
-    const enrolled = await StudentCourses.findAll({
-      where: { studentId },
+    // Fetch the student to get classId
+    const student = await Student.findByPk(studentId);
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    const classId = student.classId;
+
+    // All courses where this student is enrolled (CourseStats maps course → class)
+    const courseStats = await CourseStats.findAll({
+      where: { classId },
+      include: [{ model: Course }],
     });
 
-    if (!enrolled.length) return res.json({ success: true, attendance: [] });
+    const report = [];
 
-    // fetch course info
-    const courseIds = enrolled.map((e) => e.courseId);
-    const courses = await Course.findAll({ where: { id: courseIds } });
+    for (const stat of courseStats) {
+      const course = stat.Course;
+      const totalClasses = stat.totalClasses;
 
-    //fetch attendance count per course
-    const attendance = await Attendance.findAll({
-      include: [
-        {
-          model: Session,
-          attributes: ["courseId"],
+      // Fetch all sessions of that course for this class
+      const sessions = await Session.findAll({
+        where: { courseId: course.id },
+        include: [
+          {
+            model: Class,
+            where: { id: classId }, // ensures session belongs to student's class
+            through: { attributes: [] },
+          },
+        ],
+        attributes: ["id"],
+      });
+
+      const sessionIds = sessions.map((s) => s.id);
+
+      // Count attendance for student
+      const presentCount = await Attendance.count({
+        where: {
+          studentId,
+          sessionId: sessionIds,
         },
-      ],
-      where: { studentId },
+      });
+
+      const percentage =
+        totalClasses === 0
+          ? 0
+          : Number(((presentCount / totalClasses) * 100).toFixed(2));
+
+      report.push({
+        courseId: course.id,
+        courseName: course.name,
+        courseCode: course.code,
+        present: presentCount,
+        total: totalClasses,
+        percentage,
+      });
+    }
+
+    return res.json({
+      success: true,
+      attendance: report,
     });
-
-    // count per course
-    const presentCount = {};
-    attendance.forEach((a) => {
-      const cid = a.Session.courseId;
-      presentCount[cid] = (presentCount[cid] || 0) + 1;
-    });
-
-    // fetch total class count
-    const stats = await CourseStats.findAll({
-      where: { courseId: courseIds },
-    });
-
-    const totalMap = {};
-    stats.forEach((s) => {
-      totalMap[s.courseId] = s.totalClasses;
-    });
-
-    // build respose
-    const report = courses.map((c) => {
-      const present = presentCount[c.id] || 0;
-      const total = totalMap[c.id] || 0;
-
-      return {
-        courseId: c.id,
-        courseName: c.name,
-        courseCode: c.code,
-        present,
-        total,
-        percentage:
-          total === 0 ? 0 : Number(((present / total) * 100).toFixed(2)),
-      };
-    });
-
-    res.json({ success: true, attendance: report });
   } catch (err) {
-    console.error("Student Report Error: ", err);
-    res.status(500).json({ success: false, message: "Server Error." });
+    console.error("Student Report Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
   }
 });
 
 // GET /api/report/session/:sessionId
-
 router.get("/session/:sessionId", auth(["teacher"]), async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -96,34 +108,61 @@ router.get("/session/:sessionId", auth(["teacher"]), async (req, res) => {
       include: [{ model: Course }],
     });
 
-    if (!session)
-      return res
-        .status(404)
-        .json({ sucess: false, message: "Session not found" });
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Session not found",
+      });
+    }
 
-    // fetch all attendance entries already marked
-    const attendance = await Attendance.findAll({
-      where: { sessionId },
-      include: [{ model: Student }],
+    // 1. Fetch all class IDs attached to session
+    const classIds = session.classIds || []; // depends on your DB design
+
+    // 2. Fetch all students in those classes
+    const enrolledStudents = await Student.findAll({
+      include: [
+        {
+          model: StudentCourses,
+          where: { courseId: session.courseId },
+          required: false,
+        },
+      ],
     });
 
-    const presentStudents = attendance.map((a) => ({
-      id: a.Student.id,
-      firstName: a.Student.firstName,
-      lastName: a.Student.lastName,
-      MIS: a.Student.MIS,
-      department: a.Student.department,
+    // 3. Fetch marked attendance
+    const attendance = await Attendance.findAll({
+      where: { sessionId },
+    });
+
+    const presentMap = {};
+    attendance.forEach((a) => (presentMap[a.studentId] = true));
+
+    // 4. Build full attendance list
+    const report = enrolledStudents.map((stu) => ({
+      id: stu.id,
+      firstName: stu.firstName,
+      lastName: stu.lastName,
+      MIS: stu.MIS,
+      department: stu.department,
+      present: !!presentMap[stu.id],
     }));
 
     res.json({
       success: true,
       sessionId,
-      courseName: session.Course.name,
-      presentStudents,
+      course: {
+        id: session.Course.id,
+        name: session.Course.name,
+        code: session.Course.code,
+      },
+      students: report,
     });
   } catch (err) {
-    console.error("Session Report Error: ", err);
-    res.status(500).json({ success: false, message: "Server Error" });
+    console.error("Session Report Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
   }
 });
 

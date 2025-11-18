@@ -110,7 +110,7 @@ router.get("/:sessionId/qr", auth(["teacher"]), async (req, res) => {
 
     const nonce = uuidv4();
     const iat = Math.floor(Date.now() / 1000);
-    const exp = iat + 500; // QR expiry 500 seconds
+    const exp = iat + 5; // QR expiry 5 seconds
     const qrPayload = { sessionId, nonce, iat, exp };
     const qrToken = jwt.sign(qrPayload, process.env.QR_JWT_SECRET);
 
@@ -118,8 +118,8 @@ router.get("/:sessionId/qr", auth(["teacher"]), async (req, res) => {
       `qr:${nonce}`,
       JSON.stringify({ sessionId, iat, exp }),
       "EX",
-      520 // 500 seconds + 20 extra seconds in redis
-    ); // Store nonce with 65 seconds expiry
+      7 // 5 seconds + 2 extra seconds in redis
+    ); // Store nonce with 7 seconds expiry
 
     const qrImage = await QRCode.toDataURL(qrToken);
     res.json({
@@ -332,7 +332,6 @@ router.post("/:sessionId/mark", auth(["teacher"]), async (req, res) => {
   }
 });
 
-//POST extend session
 // POST extend session
 router.post("/:sessionId/extend", auth(["teacher"]), async (req, res) => {
   try {
@@ -345,40 +344,38 @@ router.post("/:sessionId/extend", auth(["teacher"]), async (req, res) => {
         .status(404)
         .json({ success: false, message: "Session not found" });
 
-    // Reactivate if previously ended
-    if (!session.active) {
-      session.active = true;
-    }
-
-    // Extend endTime
-    const newEnd = new Date(session.endTime.getTime() + extraMinutes * 60000);
-    session.endTime = newEnd;
+    // Update DB end time
+    session.endTime = new Date(
+      session.endTime.getTime() + extraMinutes * 60000
+    );
+    session.active = true; // ensure active
     await session.save();
 
-    // Extend Redis TTL
-    const ttl = await redis.ttl(`activeSession:${sessionId}`);
+    // Ensure Redis key exists
+    const redisKey = `activeSession:${sessionId}`;
+    const ttl = await redis.ttl(redisKey);
+
     if (ttl > 0) {
-      await redis.expire(`activeSession:${sessionId}`, ttl + extraMinutes * 60);
+      await redis.expire(redisKey, ttl + extraMinutes * 60);
     } else {
-      // Redis key expired → recreate it
       await redis.set(
-        `activeSession:${sessionId}`,
+        redisKey,
         JSON.stringify({
           teacherId: session.teacherId,
           courseId: session.courseId,
-          classIds: [], // or refetch
+          classIds: [],
           startTime: session.startTime,
-          endTime: newEnd,
+          endTime: session.endTime,
         }),
         "EX",
         extraMinutes * 60
       );
     }
 
-    return res.json({
+    res.json({
       success: true,
       message: "Session extended",
-      newEnd,
+      newEnd: session.endTime,
     });
   } catch (error) {
     console.error("Extend session Error: ", error);

@@ -15,24 +15,46 @@ export default function HeaderBar({ toggleSidebar }) {
     return () => clearInterval(interval);
   }, [offset]);
 
+  const Wrapper = ({ children }) => (
+    <div
+      className="flex items-center justify-between px-6 py-4 
+        bg-gray-300 backdrop-blur-sm shadow-sm border-b border-gray-300/40"
+    >
+      {children}
+    </div>
+  );
+
   if (offset == null) {
     return (
-      <div className="flex items-center justify-between p-4 bg-white shadow">
-        <button onClick={toggleSidebar}>☰</button>
-        <span>Fetching time...</span>
-      </div>
+      <Wrapper>
+        <button
+          onClick={toggleSidebar}
+          className="text-gray-700 text-xl px-3 py-1 rounded hover:bg-gray-300"
+        >
+          ☰
+        </button>
+        <span className="text-gray-700 font-medium">Fetching time...</span>
+      </Wrapper>
     );
   }
 
   const dateObj = new Date(time);
 
   return (
-    <div className="flex items-center justify-between p-4 bg-white shadow">
-      <button onClick={toggleSidebar}>☰</button>
+    <Wrapper>
+      <button
+        onClick={toggleSidebar}
+        className="text-gray-700 text-xl px-3 py-1 rounded hover:bg-gray-300 transition"
+      >
+        ☰
+      </button>
+
       <div className="text-right">
-        <p>{dateObj.toLocaleTimeString()}</p>
+        <p className="text-gray-800 font-semibold text-lg">
+          {dateObj.toLocaleTimeString()}
+        </p>
         <p className="text-xs text-gray-600">{dateObj.toLocaleDateString()}</p>
       </div>
-    </div>
+    </Wrapper>
   );
 }

@@ -21,52 +21,103 @@ export default function SessionPage() {
   // Live attendance
   const [presentStudents, setPresentStudents] = useState([]);
 
-  // When session ends
+  // Ended?
   const [sessionEnded, setSessionEnded] = useState(false);
 
-  // Extend session UI
+  // Extend
   const [extendMinutes, setExtendMinutes] = useState(5);
   const [extending, setExtending] = useState(false);
 
-  // Refs
-  const qrIntervalRef = useRef(null);
-  const sessionIntervalRef = useRef(null);
-  const liveIntervalRef = useRef(null);
+  // Notification
+  const [note, setNote] = useState("");
 
-  // -----------------------------
-  // FETCH QR
-  // -----------------------------
+  // timers
+  const qrInterval = useRef(null);
+  const sesInterval = useRef(null);
+  const liveInterval = useRef(null);
+
+  /* -------------------------------------------------------
+     HELPERS
+  -------------------------------------------------------- */
+  const clearAllIntervals = () => {
+    clearInterval(qrInterval.current);
+    clearInterval(sesInterval.current);
+    clearInterval(liveInterval.current);
+  };
+
+  const notify = (msg) => {
+    setNote(msg);
+    setTimeout(() => setNote(""), 2000);
+  };
+
+  /* -------------------------------------------------------
+     FETCH QR
+  -------------------------------------------------------- */
   const fetchQr = async () => {
     try {
       const res = await api.get(`/teacher/sessions/${sessionId}/qr`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       setQrImage(res.data.qrImage);
-      setQrExpiry(res.data.validTo);
+      setQrExpiry(new Date(res.data.validTo).getTime());
     } catch (err) {
       console.error("QR ERROR:", err);
     }
   };
 
-  // -----------------------------
-  // FETCH LIVE
-  // -----------------------------
+  /* -------------------------------------------------------
+     FETCH LIVE
+  -------------------------------------------------------- */
   const fetchLive = async () => {
     try {
       const res = await api.get(`/teacher/sessions/${sessionId}/live`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       setPresentStudents(res.data.presentStudents || []);
     } catch (err) {
       console.error("LIVE ERROR:", err);
     }
   };
 
-  // -----------------------------
-  // EXTEND SESSION
-  // -----------------------------
+  /* -------------------------------------------------------
+     START TIMERS
+  -------------------------------------------------------- */
+  const startTimers = () => {
+    clearAllIntervals();
+
+    // QR Timer
+    qrInterval.current = setInterval(() => {
+      if (!qrExpiry) return;
+      const left = Math.max(Math.floor((qrExpiry - Date.now()) / 1000), 0);
+      setQrRemaining(left);
+      if (left <= 0) fetchQr();
+    }, 1000);
+
+    // SESSION TIMER
+    sesInterval.current = setInterval(() => {
+      if (!sessionEndTime) return;
+      const left = Math.max(
+        Math.floor((sessionEndTime - Date.now()) / 1000),
+        0
+      );
+      setSessionRemaining(left);
+
+      if (left <= 0) {
+        setSessionEnded(true);
+        clearAllIntervals();
+      }
+    }, 1000);
+
+    // LIVE attendance timer
+    liveInterval.current = setInterval(fetchLive, 5000);
+
+    // **Fix:** fetch live instantly (no 5s delay)
+    fetchLive();
+  };
+
+  /* -------------------------------------------------------
+     EXTEND SESSION
+  -------------------------------------------------------- */
   const extendSession = async () => {
     try {
       setExtending(true);
@@ -77,23 +128,27 @@ export default function SessionPage() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const newEndUTC = new Date(res.data.newEnd).getTime();
-      setSessionEndTime(newEndUTC);
+      const newEnd = new Date(res.data.newEnd).getTime();
+      setSessionEndTime(newEnd);
 
-      // Restart countdown
       setSessionEnded(false);
 
-      setExtending(false);
-      alert("Session extended successfully!");
+      // Restart timers from absolute zero
+      startTimers();
+
+      // Fetch QR immediately for fresh session
+      fetchQr();
+
+      notify("Session extended");
     } catch (err) {
       console.error("EXTEND ERROR:", err);
-      setExtending(false);
     }
+    setExtending(false);
   };
 
-  // -----------------------------
-  // END SESSION NOW
-  // -----------------------------
+  /* -------------------------------------------------------
+     END SESSION NOW
+  -------------------------------------------------------- */
   const endSessionNow = async () => {
     try {
       await api.post(
@@ -103,55 +158,26 @@ export default function SessionPage() {
       );
 
       setSessionEnded(true);
+      clearAllIntervals();
     } catch (err) {
       console.error("END ERROR:", err);
     }
   };
 
-  // -----------------------------
-  // INITIAL LOAD
-  // -----------------------------
+  /* -------------------------------------------------------
+     INITIAL LOAD
+  -------------------------------------------------------- */
   useEffect(() => {
     fetchQr();
     fetchLive();
 
-    const state = location.state?.session;
-    if (state?.endTime) {
-      setSessionEndTime(new Date(state.endTime).getTime());
-    }
+    const st = location.state?.session;
+    if (st?.endTime) setSessionEndTime(new Date(st.endTime).getTime());
+  }, []);
 
-    // QR countdown
-    qrIntervalRef.current = setInterval(() => {
-      if (!qrExpiry) return;
-      const now = Date.now();
-      const left = Math.max(Math.floor((qrExpiry - now) / 1000), 0);
-      setQrRemaining(left);
-
-      if (left <= 0) fetchQr();
-    }, 1000);
-
-    // Session countdown
-    sessionIntervalRef.current = setInterval(() => {
-      if (!sessionEndTime) return;
-      const now = Date.now();
-      const left = Math.max(Math.floor((sessionEndTime - now) / 1000), 0);
-      setSessionRemaining(left);
-
-      if (left <= 0) {
-        clearInterval(sessionIntervalRef.current);
-        setSessionEnded(true);
-      }
-    }, 1000);
-
-    // Live attendance every 5 sec
-    liveIntervalRef.current = setInterval(fetchLive, 5000);
-
-    return () => {
-      clearInterval(qrIntervalRef.current);
-      clearInterval(sessionIntervalRef.current);
-      clearInterval(liveIntervalRef.current);
-    };
-  }, [qrExpiry, sessionEndTime]);
+  useEffect(() => {
+    if (sessionEndTime && qrExpiry) startTimers();
+  }, [sessionEndTime, qrExpiry]);
 
   const format = (sec) => {
     const m = Math.floor(sec / 60);
@@ -159,14 +185,21 @@ export default function SessionPage() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  // -----------------------------
-  // UI
-  // -----------------------------
+  /* -------------------------------------------------------
+     UI
+  -------------------------------------------------------- */
   return (
-    <div className="min-h-screen p-10 bg-gray-100 flex gap-6">
-      {/* LEFT — LIVE ATTENDANCE */}
+    <div className="min-h-screen p-10 bg-gray-300 flex gap-6">
+      {/* Notification */}
+      {note && (
+        <div className="fixed top-4 right-4 bg-black/80 text-white px-4 py-2 rounded shadow z-50">
+          {note}
+        </div>
+      )}
+
+      {/* LEFT – LIVE ATTENDANCE */}
       <div className="w-1/3">
-        <div className="bg-white h-full p-4 shadow-xl rounded-xl overflow-y-auto">
+        <div className="bg-white p-4 shadow-xl rounded-xl h-full overflow-y-auto">
           <h2 className="text-xl font-semibold mb-3">Live Attendance</h2>
 
           {presentStudents.length === 0 ? (
@@ -178,14 +211,12 @@ export default function SessionPage() {
                   key={stu.id}
                   className="p-3 bg-green-50 border border-green-300 rounded-lg shadow-sm"
                 >
-                  <p className="font-bold text-lg">{stu.MIS}</p>
-                  <p className="text-sm text-gray-700">
+                  <p className="font-bold">{stu.MIS}</p>
+                  <p className="text-sm">
                     {stu.firstName} {stu.lastName}
                   </p>
                   {stu.Class && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {stu.Class.name}
-                    </p>
+                    <p className="text-xs text-gray-500">{stu.Class.name}</p>
                   )}
                 </li>
               ))}
@@ -196,24 +227,23 @@ export default function SessionPage() {
 
       {/* CENTER — QR */}
       <div className="flex-1 flex flex-col items-center">
-        <div className="bg-white p-6 shadow-xl rounded-xl">
-          {qrImage ? (
-            <img src={qrImage} className="w-[420px] h-[420px]" />
-          ) : (
-            <p>Loading QR...</p>
-          )}
-        </div>
+        {!sessionEnded && (
+          <div className="bg-white p-6 shadow-xl rounded-xl">
+            {qrImage ? (
+              <img src={qrImage} className="w-[420px] h-[420px]" />
+            ) : (
+              <p>Loading QR...</p>
+            )}
+          </div>
+        )}
 
         {sessionEnded && (
           <div className="mt-8 text-center">
             <p className="text-red-600 font-bold text-xl mb-4">Session Ended</p>
 
             <div className="flex gap-4 justify-center">
-              {/* Extend Session */}
               <div className="bg-white p-4 rounded-xl shadow-md">
-                <p className="text-sm mb-2 font-medium">
-                  Extend Session By (mins)
-                </p>
+                <p className="text-sm font-medium mb-2">Extend Session</p>
 
                 <select
                   className="border p-2 rounded w-32"
@@ -221,27 +251,24 @@ export default function SessionPage() {
                   onChange={(e) => setExtendMinutes(Number(e.target.value))}
                 >
                   {Array.from({ length: 15 }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>
-                      {n} min
-                    </option>
+                    <option key={n}>{n}</option>
                   ))}
                 </select>
 
                 <button
                   onClick={extendSession}
                   disabled={extending}
-                  className="mt-3 w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                  className="mt-3 w-full bg-green-600 text-white py-2 rounded"
                 >
                   {extending ? "Extending..." : "Extend"}
                 </button>
               </div>
 
-              {/* Review Page */}
               <button
                 onClick={() => navigate(`/session/${sessionId}/review`)}
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg shadow hover:bg-blue-700"
+                className="bg-blue-600 text-white px-8 py-3 rounded shadow hover:bg-blue-700"
               >
-                Go to Review
+                Review
               </button>
             </div>
           </div>
@@ -257,22 +284,14 @@ export default function SessionPage() {
             <b>Session Ends In:</b>
             <br />
             <span className="text-red-600">
-              {sessionRemaining !== null ? format(sessionRemaining) : "..."}
-            </span>
-          </p>
-
-          <p className="text-lg mt-6">
-            <b>QR Refresh In:</b>
-            <br />
-            <span className="text-blue-600">
-              {qrRemaining !== null ? `${qrRemaining}s` : "..."}
+              {sessionRemaining != null ? format(sessionRemaining) : "..."}
             </span>
           </p>
 
           {!sessionEnded && (
             <button
               onClick={endSessionNow}
-              className="mt-6 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 w-full"
+              className="mt-6 w-full bg-red-600 text-white py-3 rounded"
             >
               End Session Now
             </button>

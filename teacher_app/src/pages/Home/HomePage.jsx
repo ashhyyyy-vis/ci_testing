@@ -8,17 +8,15 @@ import api from "@/lib/axios";
 import { useNavigate } from "react-router-dom";
 
 export default function HomePage() {
-  const { user, token } = useContext(AuthContext);
+  const { user, token, offset } = useContext(AuthContext);
 
-  // hooks
   const navigate = useNavigate();
 
-  // state
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedClasses, setSelectedClasses] = useState([]);
   const [duration, setDuration] = useState(3);
-  const { offset } = useContext(AuthContext);
+
   const [time, setTime] = useState(Date.now() + offset);
 
   useEffect(() => {
@@ -29,7 +27,7 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [offset]);
 
-  // fetch courses on load
+  // Fetch courses
   useEffect(() => {
     if (!token) return;
 
@@ -37,21 +35,16 @@ export default function HomePage() {
       .get("/teacher/sessions/courses", {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((res) => {
-        console.log("COURSES API RESULT:", res.data);
-        setCourses(res.data.courses || []);
-      })
-      .catch((err) => console.error("COURSE FETCH ERROR:", err));
+      .then((res) => setCourses(res.data.courses || []))
+      .catch((err) => console.error(err));
   }, [token]);
 
-  // toggle class selection
   const toggleClass = (cls) => {
     setSelectedClasses((prev) =>
       prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls]
     );
   };
 
-  // start session
   const handleStartSession = () => {
     if (!selectedCourse || selectedClasses.length === 0) return;
 
@@ -66,68 +59,76 @@ export default function HomePage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
-        console.log("SESSION STARTED:", res.data);
-
         const session = res.data.session;
-        const sessionId = res.data.session.id; // CORRECT SOURCE
-
-        navigate(`/session/${sessionId}`, { state: { session } });
+        navigate(`/session/${session.id}`, { state: { session } });
       })
-      .catch((err) => console.error("SESSION START ERROR:", err));
+      .catch((err) => console.error(err));
   };
 
   return (
     <DashboardLayout>
-      {/* TRUE BACKGROUND IMAGE */}
       <div
-        className="min-h-screen bg-cover bg-center pb-10"
+        className="min-h-screen bg-cover bg-center bg-fixed px-4 pb-12 pt-20"
         style={{
           backgroundImage: "url('/bg-teacher.jpg')",
-          backgroundAttachment: "fixed",
         }}
       >
-        {/* CENTER PROFILE BOX */}
-        <Card className="max-w-5xl mx-auto mb-10 mt-10 shadow-lg border border-gray-200 bg-white/90">
-          <CardHeader>
-            <CardTitle className="text-xl">Teacher Profile</CardTitle>
+        {/* Profile Card */}
+        <Card className="max-w-5xl mx-auto mb-12 shadow-xl border border-gray-200 bg-white/30 backdrop-blur-md rounded-3xl">
+          <CardHeader className="pb-0">
+            <CardTitle className="text-2xl font-semibold text-gray-900">
+              Teacher Profile
+            </CardTitle>
           </CardHeader>
 
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-              <div className="flex justify-center md:justify-start">
-                <Avatar className="h-32 w-32">
-                  <AvatarFallback className="text-3xl">
+          <CardContent className="pt-4 pb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center pl-6">
+              {/* Added pl-6 to shift entire section right */}
+
+              {/* Avatar */}
+              <div className="flex justify-center md:justify-start md:ml-6">
+                {/* also nudged right slightly with md:ml-6 */}
+                <Avatar className="h-28 w-28 shadow-lg">
+                  <AvatarFallback className="text-3xl bg-blue-100 text-blue-700">
                     {user?.firstName?.[0]}
                     {user?.lastName?.[0]}
                   </AvatarFallback>
                 </Avatar>
               </div>
 
-              {/* Profile details */}
-              <div className="text-gray-700 space-y-2">
-                <p className="text-xl font-semibold">
+              {/* Info */}
+              <div className="space-y-2 text-gray-800 md:ml-4">
+                {/* added md:ml-4 for better spacing */}
+                <p className="text-xl font-bold">
                   {user?.firstName} {user?.lastName}
                 </p>
-                <p>{user?.email}</p>
-                <p>Faculty ID: {user?.facultyId}</p>
-                <p>Department: {user?.department}</p>
-                <p>Role: {user?.role}</p>
+                <p className="text-sm opacity-80">{user?.email}</p>
+                <p className="text-sm opacity-80">
+                  Faculty ID: {user?.facultyId}
+                </p>
+                <p className="text-sm opacity-80">
+                  Department: {user?.department}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* COURSE & CLASS SELECTOR */}
-        <Card className="max-w-5xl mx-auto shadow-lg border border-gray-200 bg-white/90">
+        {/* Course/Class Selection */}
+        <Card className="max-w-5xl mx-auto shadow-xl border border-gray-200 bg-white/30 backdrop-blur-md rounded-3xl">
           <CardHeader>
-            <CardTitle className="text-xl">Start Attendance Session</CardTitle>
+            <CardTitle className="text-2xl font-semibold text-gray-900">
+              Start Attendance Session
+            </CardTitle>
           </CardHeader>
 
           <CardContent>
-            {/* COURSES */}
-            <p className="text-lg font-semibold mb-2">Choose Course</p>
+            {/* Courses */}
+            <p className="text-lg font-semibold mb-3 text-gray-800">
+              Choose Course
+            </p>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {courses.map((course) => (
                 <div
                   key={course.id}
@@ -135,52 +136,64 @@ export default function HomePage() {
                     setSelectedCourse(course);
                     setSelectedClasses([]);
                   }}
-                  className={`cursor-pointer p-5 rounded-xl border text-center transition shadow-sm 
+                  className={`
+                    cursor-pointer p-5 rounded-2xl border shadow-sm 
+                    transition-all duration-200
                     ${
                       selectedCourse?.id === course.id
-                        ? "border-blue-600 bg-blue-50 shadow-md"
-                        : "border-gray-300 bg-white/70 backdrop-blur hover:bg-gray-100"
-                    }`}
+                        ? "border-blue-600 bg-blue-100/70 scale-[1.03]"
+                        : "border-gray-300 bg-white/60 hover:bg-white/80 hover:scale-[1.02]"
+                    }
+                  `}
                 >
-                  <p className="font-bold text-md">{course.name}</p>
+                  <p className="font-bold text-md text-gray-900">
+                    {course.name}
+                  </p>
                   <p className="text-xs text-gray-600">{course.code}</p>
                 </div>
               ))}
             </div>
 
-            {/* CLASSES */}
+            {/* Classes */}
             {selectedCourse && (
               <>
-                <p className="text-lg font-semibold mb-2">Choose Classes</p>
+                <p className="text-lg font-semibold mb-3 text-gray-800">
+                  Choose Classes
+                </p>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                   {selectedCourse.Classes.map((cls) => (
                     <div
                       key={cls.id}
                       onClick={() => toggleClass(cls)}
-                      className={`cursor-pointer p-4 rounded-xl border text-center transition shadow-sm
+                      className={`
+                        cursor-pointer p-4 rounded-2xl border shadow-sm 
+                        transition-all duration-200
                         ${
                           selectedClasses.includes(cls)
-                            ? "border-green-600 bg-green-50 shadow-md"
-                            : "border-gray-300 bg-white/70 backdrop-blur hover:bg-gray-100"
-                        }`}
+                            ? "border-green-600 bg-green-100/70 scale-[1.03]"
+                            : "border-gray-300 bg-white/60 hover:bg-white/80 hover:scale-[1.02]"
+                        }
+                      `}
                     >
-                      <p className="font-semibold">{cls.name}</p>
+                      <p className="font-semibold text-gray-900">{cls.name}</p>
                     </div>
                   ))}
                 </div>
               </>
             )}
 
-            {/* DURATION */}
+            {/* Duration Selector */}
             {selectedClasses.length > 0 && (
-              <div className="mb-6">
-                <p className="text-lg font-semibold mb-2">Session Duration</p>
+              <div className="mb-8">
+                <p className="text-lg font-semibold mb-3 text-gray-800">
+                  Session Duration
+                </p>
 
                 <select
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
-                  className="border border-gray-300 p-2 rounded w-40"
+                  className="border border-gray-400 p-3 rounded-xl w-44 bg-white/70 backdrop-blur-md"
                 >
                   {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
                     <option key={num} value={num}>
@@ -191,9 +204,12 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* START BUTTON */}
+            {/* Start Button */}
             {selectedCourse && selectedClasses.length > 0 && (
-              <Button className="mt-4" onClick={handleStartSession}>
+              <Button
+                className="mt-4 px-8 py-3 text-lg rounded-xl"
+                onClick={handleStartSession}
+              >
                 Start Session
               </Button>
             )}

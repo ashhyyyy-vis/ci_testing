@@ -44,11 +44,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center bg-cover bg-center"
-      style={{ backgroundImage: "url('/src/assets/bg-login.jpg')" }}
-    >
-      <div className="bg-white/90 backdrop-blur-sm p-10 rounded-xl shadow-xl w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#dbeafe] via-[#bfdbfe] to-[#93c5fd]">
+      <div className="bg-gray-200/80 backdrop-blur-md p-10 rounded-xl shadow-2xl w-full max-w-md border border-white/20">
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <img
@@ -74,6 +71,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              className="border border-gray-400 focus:border-gray-400"
             />
           </div>
 
@@ -82,10 +80,11 @@ export default function LoginPage() {
             <label className="text-sm font-medium">Password</label>
             <Input
               type="password"
-              placeholder="123456"
+              placeholder="••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              className="border border-gray-400 focus:border-gray-400"
             />
           </div>
 
