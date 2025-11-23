@@ -22,7 +22,7 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.version || '20.x' }}
-        cache: "npm"
+        #cache: "npm"
 
     # Python
     - name: Setup Python
@@ -30,7 +30,7 @@ runs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.version || '3.x' }}
-        cache: "pip"
+        #cache: "pip"
 
     # Java
     - name: Setup Java
@@ -39,7 +39,7 @@ runs:
       with:
         distribution: "temurin"
         java-version: ${{ inputs.version || '17' }}
-        cache: "gradle"
+        #cache: "gradle"
 
     # Go
     - name: Setup Go
