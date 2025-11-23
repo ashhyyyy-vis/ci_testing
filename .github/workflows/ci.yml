@@ -34,7 +34,7 @@ jobs:
           core.setOutput("runtime_version", config.runtime_version || "");
 
     - name: Setup Environment
-      uses: ./.github/workflows/actions/setup-environment/action.yml
+      uses: ./.github/workflows/actions/setup-environment/
       with:
         runtime: ${{ steps.config.outputs.runtime }}
         version: ${{ steps.config.outputs.runtime_version }}
