@@ -17,7 +17,7 @@ runs:
       id: config
       shell: bash
       run: |
-        CONFIG=$(jq -r --arg app ${INPUT_APP_DIR} '.apps[$app]' ${{ inputs.config-path }})
+        CONFIG=$(jq -r --arg app "${{ inputs.app-dir }}" '.apps[$app]' ${{ inputs.config-path }})
         echo "config=$CONFIG" >> $GITHUB_OUTPUT
         echo "type=$(echo $CONFIG | jq -r '.type')" >> $GITHUB_OUTPUT
         echo "version=$(echo $CONFIG | jq -r '.version')" >> $GITHUB_OUTPUT
