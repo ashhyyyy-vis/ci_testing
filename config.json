@@ -1,7 +1,7 @@
 {
   "apps": {
     "teacher_app": {
-      "directory": "App/teacher_app",
+      "directory": "App/backend_api",
       "type": "node",
       "version": "18",
       "install-command": "npm install",
@@ -10,7 +10,7 @@
     },
 
     "student_app": {
-      "directory": "App/student_app",
+      "directory": "App/teacher_app",
       "type": "flutter",
       "version": "3.19.0",
       "install-command": "flutter pub get",
