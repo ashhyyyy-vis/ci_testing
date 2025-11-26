@@ -1,18 +1,21 @@
 {
   "apps": {
     "backend_api": {
+      "directory": "App/backend_api",
       "type": "node",
-      "version": "16.x",
+      "version": "18",
       "install-command": "npm install",
       "test-command": "npm test",
       "build-command": "npm run build"
     },
+
     "teacher_app": {
-      "type": "node",
-      "version": "22.x",
-      "install-command": "npm install",
-      "test-command": "npm test",
-      "build-command": "npm run build"
+      "directory": "App/teacher_app",
+      "type": "flutter",
+      "version": "3.19.0",
+      "install-command": "flutter pub get",
+      "test-command": "flutter test",
+      "build-command": "flutter build apk"
     }
   }
 }
