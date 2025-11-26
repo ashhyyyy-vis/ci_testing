@@ -1,6 +1,6 @@
 {
   "apps": {
-    "teacher_app": {
+    "backend_api": {
       "directory": "App/backend_api",
       "type": "node",
       "version": "18",
@@ -9,7 +9,7 @@
       "build-command": "npm run build"
     },
 
-    "student_app": {
+    "teacher_app": {
       "directory": "App/teacher_app",
       "type": "flutter",
       "version": "3.19.0",
