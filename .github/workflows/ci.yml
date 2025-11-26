@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        # USE ONLY APP IDS HERE
         app-id: ["backend_api", "teacher_app"]
 
     steps:
@@ -42,18 +43,19 @@ jobs:
           APP_DIR: ${{ steps.setup.outputs.directory }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
-          # Extract final app name (no slashes)
+          # Extract app name (safe Docker tag)
           IMAGE_APP=$(basename "$APP_DIR")
 
-          echo "Building Docker image for $IMAGE_APP"
-          
-          # Build image
+          echo "Building Docker image for $IMAGE_APP in directory $APP_DIR"
+
+          # Build
           docker build -t $DOCKERHUB_USERNAME/$IMAGE_APP:latest $APP_DIR
-          
+
           # Push latest
           docker push $DOCKERHUB_USERNAME/$IMAGE_APP:latest
-          
-          # Tag + push SHA
+
+          # Tag & push SHA version
           docker tag $DOCKERHUB_USERNAME/$IMAGE_APP:latest \
                      $DOCKERHUB_USERNAME/$IMAGE_APP:$COMMIT_SHA
           docker push $DOCKERHUB_USERNAME/$IMAGE_APP:$COMMIT_SHA
+          
