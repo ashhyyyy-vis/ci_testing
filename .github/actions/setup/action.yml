@@ -24,14 +24,56 @@ runs:
         echo "install_command=$(echo "$CONFIG" | jq -r '.["install-command"]')" >> $GITHUB_OUTPUT
         echo "test_command=$(echo "$CONFIG" | jq -r '.["test-command"]')" >> $GITHUB_OUTPUT
         echo "build_command=$(echo "$CONFIG" | jq -r '.["build-command"]')" >> $GITHUB_OUTPUT
-#Node dependency
+
+    # ───────────────────────────────────────────
+    # NODE
+    # ───────────────────────────────────────────
     - name: Setup Node.js
       if: ${{ steps.config.outputs.type == 'node' }}
       uses: actions/setup-node@v3
       with:
         node-version: ${{ steps.config.outputs.version }}
-        #cache: 'npm'
-#
+
+    # ───────────────────────────────────────────
+    # PYTHON
+    # ───────────────────────────────────────────
+    - name: Setup Python
+      if: ${{ steps.config.outputs.type == 'python' }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ steps.config.outputs.version }}
+
+    # ───────────────────────────────────────────
+    # FLUTTER
+    # ───────────────────────────────────────────
+    - name: Setup Flutter
+      if: ${{ steps.config.outputs.type == 'flutter' }}
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ steps.config.outputs.version }}
+
+    # ───────────────────────────────────────────
+    # JAVA
+    # ───────────────────────────────────────────
+    - name: Setup Java
+      if: ${{ steps.config.outputs.type == 'java' }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ steps.config.outputs.version }}
+        distribution: 'temurin'
+
+    # ───────────────────────────────────────────
+    # GO
+    # ───────────────────────────────────────────
+    - name: Setup Go
+      if: ${{ steps.config.outputs.type == 'go' }}
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ steps.config.outputs.version }}
+
+    # ───────────────────────────────────────────
+    # Shared build steps
+    # ───────────────────────────────────────────
     - name: Install dependencies
       shell: bash
       working-directory: ${{ inputs.app-dir }}
